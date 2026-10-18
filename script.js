@@ -12,98 +12,44 @@ tick();setInterval(tick,1000);
 const calendar=document.getElementById('calendarDays');const first=new Date(2026,10,1).getDay();for(let i=0;i<first;i++){calendar.appendChild(document.createElement('span'));}for(let day=1;day<=30;day++){const el=document.createElement('span');el.textContent=day;if(day===14){el.className='highlight';el.setAttribute('aria-label','Engagement day, November 14');}calendar.appendChild(el);}
 const fmt=d=>d.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
 const calendarUrl=new URL('https://calendar.google.com/calendar/render');calendarUrl.searchParams.set('action','TEMPLATE');calendarUrl.searchParams.set('text','خطوبة حسناء وعبدالله | Hasnaa & Abdullah Engagement');calendarUrl.searchParams.set('dates',fmt(EVENT_START)+'/'+fmt(EVENT_END));calendarUrl.searchParams.set('details','Join us to celebrate the engagement of Hasnaa & Abdullah! '+MAP_URL);calendarUrl.searchParams.set('location',MAP_URL);document.getElementById('calendarLink').href=calendarUrl.toString();
-// Paste the deployed Cloudflare Worker URL here (not the github.com URL).
-const RSVP_API_URL = 'PASTE_CLOUDFLARE_WORKER_URL_HERE';
 const rsvpForm = document.getElementById('rsvpForm');
-const attendance = document.getElementById('attending');
-
-rsvpForm.addEventListener('submit', async e => {
-  e.preventDefault();
-  const status = document.getElementById('rsvpStatus');
-  const button = rsvpForm.querySelector('button[type="submit"]');
-  if (!RSVP_API_URL.startsWith('https://')) {
-    status.textContent = 'RSVP is not configured yet. Please contact the hosts.';
-    return;
-  }
+rsvpForm.addEventListener('submit', event => {
+  event.preventDefault();
   const name = document.getElementById('guestName').value.trim();
-  const attending = attendance.value;
-  const count = attending === 'yes' ? 1 : 0;
   if (!name) return;
-  button.disabled = true;
-  status.textContent = 'جاري تسجيل ردك... / Saving your RSVP...';
-  try {
-    const response = await fetch(RSVP_API_URL, {
-      method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-      body: JSON.stringify({ name, attending, count })
-    });
-    if (!response.ok) throw new Error('Save failed');
-    status.textContent = 'تم تسجيل ردك بنجاح! شكراً ليك ❤️ / Your RSVP has been saved!';
-    rsvpForm.reset();
-  } catch (_) {
-    status.textContent = 'حصلت مشكلة في تسجيل الرد. جربي تاني / Could not save, please retry.';
-  } finally { button.disabled = false; }
+  const attending = document.getElementById('attending').value === 'yes';
+  document.getElementById('rsvpStatus').textContent = attending
+    ? `شكرًا يا ${name} ❤️ مستنيينك تنورنا! · Thank you! Can't wait to see you!`
+    : `شكرًا على ردك يا ${name} ❤️ هتوحشنا! · Thank you for letting us know!`;
 });
-// Start at 00:51, without allowing any audible playback before seeking.
+// Music button stays responsive; begin at 00:51 after metadata is available.
 const musicBtn = document.getElementById('musicBtn');
 const musicLabel = document.getElementById('musicLabel');
 const music = new Audio('./engagement-song.mp3');
 const START_AT = 51;
 music.preload = 'auto';
 let musicWanted = true;
-let musicInitialized = false;
-let starting = null;
-function syncMusic() {
-  musicBtn.setAttribute('aria-pressed', String(!music.paused));
-  musicLabel.textContent = music.paused ? 'Music Off' : 'Music On';
+let musicStarted = false;
+function updateMusicUI() {
+  musicBtn.setAttribute('aria-pressed', String(musicWanted));
+  musicLabel.textContent = musicWanted ? 'Music On' : 'Music Off';
 }
-function waitMetadata() {
-  if (music.readyState >= 1) return Promise.resolve();
-  return new Promise((resolve,reject) => {
-    const ok = () => {cleanup();resolve();};
-    const bad = () => {cleanup();reject(new Error('Audio could not load'));};
-    const cleanup = () => {music.removeEventListener('loadedmetadata',ok);music.removeEventListener('error',bad);};
-    music.addEventListener('loadedmetadata',ok,{once:true});
-    music.addEventListener('error',bad,{once:true});
-    music.load();
-  });
-}
-function waitSeek() {
-  return new Promise((resolve,reject) => {
-    const done=()=>{cleanup();resolve();};
-    const bad=()=>{cleanup();reject(new Error('Audio seek failed'));};
-    const cleanup=()=>{music.removeEventListener('seeked',done);music.removeEventListener('error',bad);};
-    music.addEventListener('seeked',done,{once:true});
-    music.addEventListener('error',bad,{once:true});
+function startFrom51() {
+  if (!musicWanted) return;
+  if (!musicStarted && music.readyState >= 1) {
+    if (Number.isFinite(music.duration) && music.duration <= START_AT) return;
     music.currentTime = START_AT;
-    if (!music.seeking && Math.abs(music.currentTime-START_AT)<0.25) done();
-  });
+    musicStarted = true;
+  }
+  if (musicStarted) music.play().catch(() => {});
+  else music.load();
 }
-async function playMusic() {
-  musicWanted = true;
-  if (starting) return starting;
-  starting = (async()=>{
-    if (!musicInitialized) {
-      await waitMetadata();
-      if (Number.isFinite(music.duration) && music.duration <= START_AT) throw new Error('Song shorter than 51 seconds');
-      await waitSeek();
-      musicInitialized = true;
-    }
-    if (!musicWanted) return;
-    await music.play();
-    syncMusic();
-  })();
-  try { await starting; } catch(e) { console.warn('Music:',e);syncMusic(); }
-  finally {starting=null;}
-}
-function toggleMusic() {
-  if (!music.paused || (starting && musicWanted)) {musicWanted=false;music.pause();syncMusic();}
-  else playMusic();
-}
-musicBtn.addEventListener('click',toggleMusic);
-document.getElementById('envelopeScene').addEventListener('click',()=>{if(musicWanted && music.paused) playMusic();});
-document.getElementById('envelopeScene').addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ') && musicWanted && music.paused) playMusic();});
-music.addEventListener('ended',()=>{musicInitialized=false;if(musicWanted)playMusic();});
-music.addEventListener('pause',syncMusic);
-music.addEventListener('playing',syncMusic);
-syncMusic();
-// Mobile browsers may require a tap on the envelope to allow audio.
+music.addEventListener('loadedmetadata', startFrom51);
+music.addEventListener('ended', () => { musicStarted = false; startFrom51(); });
+musicBtn.addEventListener('click', () => {
+  musicWanted = !musicWanted;
+  updateMusicUI();
+  if (musicWanted) startFrom51(); else music.pause();
+});
+document.getElementById('envelopeScene').addEventListener('click', startFrom51);
+updateMusicUI();
