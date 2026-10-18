@@ -13,7 +13,43 @@ const calendar=document.getElementById('calendarDays');const first=new Date(2026
 const fmt=d=>d.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
 const calendarUrl=new URL('https://calendar.google.com/calendar/render');calendarUrl.searchParams.set('action','TEMPLATE');calendarUrl.searchParams.set('text','خطوبة حسناء وعبدالله | Hasnaa & Abdullah Engagement');calendarUrl.searchParams.set('dates',fmt(EVENT_START)+'/'+fmt(EVENT_END));calendarUrl.searchParams.set('details','Join us to celebrate the engagement of Hasnaa & Abdullah! '+MAP_URL);calendarUrl.searchParams.set('location',MAP_URL);document.getElementById('calendarLink').href=calendarUrl.toString();
 document.getElementById('rsvpForm').addEventListener('submit',e=>{e.preventDefault();const name=document.getElementById('guestName').value.trim();if(!name)return;const yes=document.getElementById('attending').value==='yes';const count=yes?document.getElementById('guestCount').value:'0';const message=`رد على دعوة خطوبة حسناء وعبدالله 💍\nالاسم: ${name}\n${yes?'بإذن الله هحضر ❤️':'للأسف مش هقدر أحضر'}\n${yes?'عدد الحضور: '+count:''}`;const link='https://wa.me/?text='+encodeURIComponent(message);window.open(link,'_blank','noopener,noreferrer');document.getElementById('rsvpStatus').textContent='تم تجهيز الرد على واتساب. اختاري الشخص الذي تريدين إرسال الرد إليه. / Your reply is ready to share on WhatsApp.';});
-// Gentle original instrumental notes, generated locally with Web Audio; no copyrighted audio or external downloads.
-let ctx=null,playing=false,loopId=null,noteIndex=0;const musicBtn=document.getElementById('musicBtn');const melody=[392,440,523.25,659.25,587.33,523.25,440,392,349.23,392,440,523.25,440,392,329.63,349.23];
-function playNote(){if(!ctx||!playing)return;const osc=ctx.createOscillator(),gain=ctx.createGain();osc.type='sine';osc.frequency.value=melody[noteIndex++%melody.length];gain.gain.setValueAtTime(.0001,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(.035,ctx.currentTime+.04);gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+.44);osc.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+.46);}
-musicBtn.addEventListener('click',async()=>{if(playing){playing=false;clearInterval(loopId);if(ctx)await ctx.suspend();}else{const AC=window.AudioContext||window.webkitAudioContext;if(!AC){document.getElementById('musicLabel').textContent='Unavailable';return;}if(!ctx)ctx=new AC();await ctx.resume();playing=true;playNote();loopId=setInterval(playNote,480);}musicBtn.setAttribute('aria-pressed',String(playing));document.getElementById('musicLabel').textContent=playing?'Music On':'Music Off';});
+// Play the uploaded song from 00:51 after the first envelope tap.
+const musicBtn = document.getElementById('musicBtn');
+const music = new Audio('./engagement-song.mp3');
+music.preload = 'metadata';
+const START_AT = 51;
+let songStarted = false;
+function updateMusicButton() {
+  const playing = !music.paused;
+  musicBtn.setAttribute('aria-pressed', String(playing));
+  document.getElementById('musicLabel').textContent = playing ? 'Music On' : 'Music Off';
+}
+function seekToStart() {
+  if (Number.isFinite(music.duration) && music.duration > START_AT) music.currentTime = START_AT;
+}
+music.addEventListener('loadedmetadata', () => {
+  if (!songStarted || music.currentTime < START_AT) seekToStart();
+});
+music.addEventListener('ended', () => {
+  seekToStart();
+  music.play().catch(updateMusicButton);
+});
+music.addEventListener('play', updateMusicButton);
+music.addEventListener('pause', updateMusicButton);
+function startSong() {
+  if (songStarted) return;
+  songStarted = true;
+  seekToStart();
+  music.play().catch(() => { updateMusicButton(); });
+}
+document.getElementById('envelopeScene').addEventListener('click', startSong);
+document.getElementById('envelopeScene').addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') startSong();
+});
+musicBtn.addEventListener('click', () => {
+  if (music.paused) {
+    songStarted = true;
+    if (music.currentTime < START_AT) seekToStart();
+    music.play().catch(updateMusicButton);
+  } else music.pause();
+});
