@@ -1,7 +1,7 @@
 'use strict';
 const EVENT_START = new Date('2026-11-14T19:00:00+02:00'); // Cairo, November 2026 (UTC+02)
 const EVENT_END = new Date('2026-11-14T23:00:00+02:00');
-const MAP_URL = 'https://maps.app.goo.gl/gf3uYpoaPp2fV1oQ9?g_st=ic';
+const MAP_URL = 'https://maps.app.goo.gl/pJXNiPYhiGQ7qntH6?g_st=aw';
 const envelope = document.getElementById('envelope');
 function openEnvelope(){envelope.classList.toggle('open');document.getElementById('tapHint').textContent=envelope.classList.contains('open')?'♡ تم فتح الدعوة · Invitation opened':'اضغطي على الظرف لفتح الدعوة · Tap to open';}
 document.getElementById('envelopeScene').addEventListener('click',openEnvelope);
@@ -12,7 +12,39 @@ tick();setInterval(tick,1000);
 const calendar=document.getElementById('calendarDays');const first=new Date(2026,10,1).getDay();for(let i=0;i<first;i++){calendar.appendChild(document.createElement('span'));}for(let day=1;day<=30;day++){const el=document.createElement('span');el.textContent=day;if(day===14){el.className='highlight';el.setAttribute('aria-label','Engagement day, November 14');}calendar.appendChild(el);}
 const fmt=d=>d.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
 const calendarUrl=new URL('https://calendar.google.com/calendar/render');calendarUrl.searchParams.set('action','TEMPLATE');calendarUrl.searchParams.set('text','خطوبة حسناء وعبدالله | Hasnaa & Abdullah Engagement');calendarUrl.searchParams.set('dates',fmt(EVENT_START)+'/'+fmt(EVENT_END));calendarUrl.searchParams.set('details','Join us to celebrate the engagement of Hasnaa & Abdullah! '+MAP_URL);calendarUrl.searchParams.set('location',MAP_URL);document.getElementById('calendarLink').href=calendarUrl.toString();
-document.getElementById('rsvpForm').addEventListener('submit',e=>{e.preventDefault();const name=document.getElementById('guestName').value.trim();if(!name)return;const yes=document.getElementById('attending').value==='yes';const count=yes?document.getElementById('guestCount').value:'0';const message=`رد على دعوة خطوبة حسناء وعبدالله 💍\nالاسم: ${name}\n${yes?'بإذن الله هحضر ❤️':'للأسف مش هقدر أحضر'}\n${yes?'عدد الحضور: '+count:''}`;const link='https://wa.me/?text='+encodeURIComponent(message);window.open(link,'_blank','noopener,noreferrer');document.getElementById('rsvpStatus').textContent='تم تجهيز الرد على واتساب. اختاري الشخص الذي تريدين إرسال الرد إليه. / Your reply is ready to share on WhatsApp.';});
+// Paste the deployed Cloudflare Worker URL here (not the github.com URL).
+const RSVP_API_URL = 'PASTE_CLOUDFLARE_WORKER_URL_HERE';
+const rsvpForm = document.getElementById('rsvpForm');
+const attendance = document.getElementById('attending');
+const guestCount = document.getElementById('guestCount');
+attendance.addEventListener('change', () => { guestCount.disabled = attendance.value === 'no'; });
+rsvpForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const status = document.getElementById('rsvpStatus');
+  const button = rsvpForm.querySelector('button[type="submit"]');
+  if (!RSVP_API_URL.startsWith('https://')) {
+    status.textContent = 'RSVP is not configured yet. Please contact the hosts.';
+    return;
+  }
+  const name = document.getElementById('guestName').value.trim();
+  const attending = attendance.value;
+  const count = attending === 'yes' ? Number(guestCount.value) : 0;
+  if (!name) return;
+  button.disabled = true;
+  status.textContent = 'جاري تسجيل ردك... / Saving your RSVP...';
+  try {
+    const response = await fetch(RSVP_API_URL, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify({ name, attending, count })
+    });
+    if (!response.ok) throw new Error('Save failed');
+    status.textContent = 'تم تسجيل ردك بنجاح! شكراً ليك ❤️ / Your RSVP has been saved!';
+    rsvpForm.reset();
+    guestCount.disabled = false;
+  } catch (_) {
+    status.textContent = 'حصلت مشكلة في تسجيل الرد. جربي تاني / Could not save, please retry.';
+  } finally { button.disabled = false; }
+});
 // Play the uploaded song from 00:51 after the first envelope tap.
 const musicBtn = document.getElementById('musicBtn');
 const music = new Audio('./engagement-song.mp3');

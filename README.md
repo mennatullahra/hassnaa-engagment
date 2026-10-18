@@ -1,27 +1,23 @@
-# Hasnaa & Abdullah — Engagement Invitation
+# Hasnaa & Abdullah invitation — RSVP to GitHub
 
-A static, responsive bilingual Arabic/English invitation website. No build tools or backend required.
+## 1. GitHub
+Upload `index.html`, `styles.css`, `script.js`, `rsvp.json` to the root of `mennatullahra/hassnaa-engagment`. Keep your existing `engagement-song.mp3` (do not delete it). **Do not upload worker.js to the website repo unless you want it public; it contains no token, but is meant for Cloudflare Workers.**
 
-## Preview
-Open `index.html` in a browser. For best results, serve the folder using `python -m http.server 8000` and visit `http://localhost:8000`.
+## 2. GitHub fine-grained token
+GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate. Repository access: Only `hassnaa-engagment`. Permission: Contents = Read and write. Use an expiration date and store the token privately. NEVER put the token in script.js, GitHub files, or chat.
 
-## Publish
-Upload the folder to Netlify Drop, GitHub Pages, Cloudflare Pages, or another static web host. Share the resulting URL with guests.
+## 3. Cloudflare Worker
+Sign in to Cloudflare dashboard → Workers & Pages → Create Worker → Edit code. Replace code with `worker.js` and Deploy. Under Worker Settings → Variables and Secrets add:
+- `GITHUB_TOKEN` = the token above (Secret / encrypted)
+- `ALLOWED_ORIGIN` = your exact published GitHub Pages origin, e.g. `https://mennatullahra.github.io` (no trailing slash or repository path). If using Netlify instead, use its exact origin.
 
-## Included
-- Click-to-open animated envelope and invitation card
-- Arabic/English names and copy
-- Live countdown to **November 14, 2026 at 7:00 PM Cairo time**
-- November 2026 calendar with engagement date highlighted
-- Google Calendar event link
-- Google Maps venue button using the supplied link
-- RSVP form that prepares a WhatsApp message (guest chooses the recipient)
-- Music button with a gentle, locally synthesized melody; starts only after user clicks
-- Mobile-friendly layout, keyboard access, reduced-motion support
+Copy your deployed Worker URL (`https://...workers.dev`). Edit `script.js`: replace `PASTE_CLOUDFLARE_WORKER_URL_HERE` with that URL, commit changes. The Worker must be deployed separately; putting worker.js in GitHub Pages does not run it.
 
-## Notes
-- No couple photo or music file is required; the envelope has an elegant typographic placeholder. Add a photo later if desired.
-- RSVP does **not** save responses or automatically send them to the couple. To collect RSVPs centrally, add a WhatsApp number or connect a form backend.
-- The venue name was not provided, so the site shows a map button instead of an invented address.
-- Fonts load from Google Fonts when online, with local fallbacks.
-- `script.js` contains the event date, location link and calendar details for future editing.
+## 4. Test
+Open the invitation, send one test RSVP, then check `rsvp.json` in GitHub. If it stays empty, check the Worker URL and ALLOWED_ORIGIN, and Worker logs. GitHub Pages can take a few minutes to update.
+
+## Counting guests
+Each RSVP is appended to `rsvp.json`. Count the `count` fields where `attending` is `yes` to estimate attendees. Duplicate submissions are possible; this is not identity-verified. Entries contain guest names and timestamps. For privacy, use a private repo if your hosting plan supports it, or a private database instead. On public GitHub repositories, RSVP names are publicly visible. Never collect phone numbers or other sensitive information in this setup.
+
+## Security notes
+Origin checks are not authentication; automated spam or false RSVPs are still possible. A GitHub token must remain only in Worker secrets. Worker writes may fail if the GitHub API is down or the token expires. Use GitHub branch history to restore accidental edits.
