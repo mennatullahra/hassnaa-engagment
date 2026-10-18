@@ -12,15 +12,21 @@ tick();setInterval(tick,1000);
 const calendar=document.getElementById('calendarDays');const first=new Date(2026,10,1).getDay();for(let i=0;i<first;i++){calendar.appendChild(document.createElement('span'));}for(let day=1;day<=30;day++){const el=document.createElement('span');el.textContent=day;if(day===14){el.className='highlight';el.setAttribute('aria-label','Engagement day, November 14');}calendar.appendChild(el);}
 const fmt=d=>d.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
 const calendarUrl=new URL('https://calendar.google.com/calendar/render');calendarUrl.searchParams.set('action','TEMPLATE');calendarUrl.searchParams.set('text','خطوبة حسناء وعبدالله | Hasnaa & Abdullah Engagement');calendarUrl.searchParams.set('dates',fmt(EVENT_START)+'/'+fmt(EVENT_END));calendarUrl.searchParams.set('details','Join us to celebrate the engagement of Hasnaa & Abdullah! '+MAP_URL);calendarUrl.searchParams.set('location',MAP_URL);document.getElementById('calendarLink').href=calendarUrl.toString();
+// Set the host's WhatsApp number in international format, e.g. 201XXXXXXXXX.
+const RSVP_WHATSAPP_NUMBER = 'REPLACE_WITH_HOST_WHATSAPP_NUMBER';
 const rsvpForm = document.getElementById('rsvpForm');
 rsvpForm.addEventListener('submit', event => {
   event.preventDefault();
   const name = document.getElementById('guestName').value.trim();
   if (!name) return;
+  if (!/^\d{10,15}$/.test(RSVP_WHATSAPP_NUMBER)) {
+    document.getElementById('rsvpStatus').textContent = 'رقم واتساب استقبال الردود لم يتم إضافته بعد.';
+    return;
+  }
   const attending = document.getElementById('attending').value === 'yes';
-  document.getElementById('rsvpStatus').textContent = attending
-    ? `شكرًا يا ${name} ❤️ مستنيينك تنورنا! · Thank you! Can't wait to see you!`
-    : `شكرًا على ردك يا ${name} ❤️ هتوحشنا! · Thank you for letting us know!`;
+  const message = `تأكيد حضور خطوبة حسناء وعبدالله 💍\nالاسم: ${name}\nالحضور: ${attending ? 'بإذن الله هحضر ❤️' : 'للأسف مش هقدر أحضر'}`;
+  const url = `https://wa.me/${RSVP_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+  window.location.href = url;
 });
 // Music button stays responsive; begin at 00:51 after metadata is available.
 const musicBtn = document.getElementById('musicBtn');
