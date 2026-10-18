@@ -45,58 +45,64 @@ rsvpForm.addEventListener('submit', async e => {
     status.textContent = 'حصلت مشكلة في تسجيل الرد. جربي تاني / Could not save, please retry.';
   } finally { button.disabled = false; }
 });
-// Play the uploaded song from 00:51 after the first envelope tap.
+// Music: always start at 00:51, including on Safari/iPhone.
 const musicBtn = document.getElementById('musicBtn');
 const music = new Audio('./engagement-song.mp3');
-music.preload = 'auto';
-music.autoplay = true;
 const START_AT = 51;
-let songStarted = false;
+music.preload = 'auto';
+let firstPlayback = true;
+let wantsMusic = true;
 function updateMusicButton() {
   const playing = !music.paused;
   musicBtn.setAttribute('aria-pressed', String(playing));
   document.getElementById('musicLabel').textContent = playing ? 'Music On' : 'Music Off';
 }
 function seekToStart() {
-  if (Number.isFinite(music.duration) && music.duration > START_AT) music.currentTime = START_AT;
+  if (music.readyState >= 1 && Number.isFinite(music.duration) && music.duration > START_AT) {
+    music.currentTime = START_AT;
+    return true;
+  }
+  return false;
 }
 music.addEventListener('loadedmetadata', () => {
-  if (!songStarted || music.currentTime < START_AT) seekToStart();
+  if (firstPlayback) seekToStart();
+});
+music.addEventListener('playing', () => {
+  if (firstPlayback) {
+    seekToStart();
+    firstPlayback = false;
+  }
+  updateMusicButton();
 });
 music.addEventListener('ended', () => {
+  firstPlayback = true;
   seekToStart();
-  music.play().catch(updateMusicButton);
+  if (wantsMusic) music.play().catch(updateMusicButton);
 });
-music.addEventListener('play', updateMusicButton);
 music.addEventListener('pause', updateMusicButton);
-function startSong() {
-  if (songStarted) return;
-  songStarted = true;
-  seekToStart();
-  music.play().catch(() => { updateMusicButton(); });
+async function startSong() {
+  wantsMusic = true;
+  // Wait for metadata before playing so the seek is not ignored.
+  if (music.readyState < 1) {
+    music.load();
+    await new Promise(resolve => {
+      if (music.readyState >= 1) return resolve();
+      music.addEventListener('loadedmetadata', resolve, { once: true });
+      music.addEventListener('error', resolve, { once: true });
+    });
+  }
+  if (firstPlayback) seekToStart();
+  try { await music.play(); } catch (_) { updateMusicButton(); }
 }
-document.getElementById('envelopeScene').addEventListener('click', startSong);
+document.getElementById('envelopeScene').addEventListener('click', () => {
+  if (wantsMusic && music.paused) startSong();
+});
 document.getElementById('envelopeScene').addEventListener('keydown', e => {
-  if (e.key === 'Enter' || e.key === ' ') startSong();
+  if ((e.key === 'Enter' || e.key === ' ') && wantsMusic && music.paused) startSong();
 });
 musicBtn.addEventListener('click', () => {
-  if (music.paused) {
-    songStarted = true;
-    if (music.currentTime < START_AT) seekToStart();
-    music.play().catch(updateMusicButton);
-  } else music.pause();
+  if (music.paused) startSong();
+  else { wantsMusic = false; music.pause(); }
 });
-
-// Try to start music by default. Mobile browsers may require a guest tap.
-function attemptAutoplay() {
-  if (songStarted) return;
-  seekToStart();
-  music.play().then(() => { songStarted = true; }).catch(() => {
-    updateMusicButton(); // First envelope tap or Music button will start playback.
-  });
-}
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', attemptAutoplay, { once: true });
-} else {
-  attemptAutoplay();
-}
+// Browsers generally block autoplay with sound. The envelope tap starts it.
+updateMusicButton();
