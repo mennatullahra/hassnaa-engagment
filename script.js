@@ -43,34 +43,67 @@ rsvpForm.addEventListener('submit', async e => {
     status.textContent = 'حصلت مشكلة في تسجيل الرد. جربي تاني / Could not save, please retry.';
   } finally { button.disabled = false; }
 });
-// Music button stays responsive; begin at 00:51 after metadata is available.
+// Start at 00:51, without allowing any audible playback before seeking.
 const musicBtn = document.getElementById('musicBtn');
 const musicLabel = document.getElementById('musicLabel');
 const music = new Audio('./engagement-song.mp3');
 const START_AT = 51;
 music.preload = 'auto';
 let musicWanted = true;
-let musicStarted = false;
-function updateMusicUI() {
-  musicBtn.setAttribute('aria-pressed', String(musicWanted));
-  musicLabel.textContent = musicWanted ? 'Music On' : 'Music Off';
+let musicInitialized = false;
+let starting = null;
+function syncMusic() {
+  musicBtn.setAttribute('aria-pressed', String(!music.paused));
+  musicLabel.textContent = music.paused ? 'Music Off' : 'Music On';
 }
-function startFrom51() {
-  if (!musicWanted) return;
-  if (!musicStarted && music.readyState >= 1) {
-    if (Number.isFinite(music.duration) && music.duration <= START_AT) return;
+function waitMetadata() {
+  if (music.readyState >= 1) return Promise.resolve();
+  return new Promise((resolve,reject) => {
+    const ok = () => {cleanup();resolve();};
+    const bad = () => {cleanup();reject(new Error('Audio could not load'));};
+    const cleanup = () => {music.removeEventListener('loadedmetadata',ok);music.removeEventListener('error',bad);};
+    music.addEventListener('loadedmetadata',ok,{once:true});
+    music.addEventListener('error',bad,{once:true});
+    music.load();
+  });
+}
+function waitSeek() {
+  return new Promise((resolve,reject) => {
+    const done=()=>{cleanup();resolve();};
+    const bad=()=>{cleanup();reject(new Error('Audio seek failed'));};
+    const cleanup=()=>{music.removeEventListener('seeked',done);music.removeEventListener('error',bad);};
+    music.addEventListener('seeked',done,{once:true});
+    music.addEventListener('error',bad,{once:true});
     music.currentTime = START_AT;
-    musicStarted = true;
-  }
-  if (musicStarted) music.play().catch(() => {});
-  else music.load();
+    if (!music.seeking && Math.abs(music.currentTime-START_AT)<0.25) done();
+  });
 }
-music.addEventListener('loadedmetadata', startFrom51);
-music.addEventListener('ended', () => { musicStarted = false; startFrom51(); });
-musicBtn.addEventListener('click', () => {
-  musicWanted = !musicWanted;
-  updateMusicUI();
-  if (musicWanted) startFrom51(); else music.pause();
-});
-document.getElementById('envelopeScene').addEventListener('click', startFrom51);
-updateMusicUI();
+async function playMusic() {
+  musicWanted = true;
+  if (starting) return starting;
+  starting = (async()=>{
+    if (!musicInitialized) {
+      await waitMetadata();
+      if (Number.isFinite(music.duration) && music.duration <= START_AT) throw new Error('Song shorter than 51 seconds');
+      await waitSeek();
+      musicInitialized = true;
+    }
+    if (!musicWanted) return;
+    await music.play();
+    syncMusic();
+  })();
+  try { await starting; } catch(e) { console.warn('Music:',e);syncMusic(); }
+  finally {starting=null;}
+}
+function toggleMusic() {
+  if (!music.paused || (starting && musicWanted)) {musicWanted=false;music.pause();syncMusic();}
+  else playMusic();
+}
+musicBtn.addEventListener('click',toggleMusic);
+document.getElementById('envelopeScene').addEventListener('click',()=>{if(musicWanted && music.paused) playMusic();});
+document.getElementById('envelopeScene').addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ') && musicWanted && music.paused) playMusic();});
+music.addEventListener('ended',()=>{musicInitialized=false;if(musicWanted)playMusic();});
+music.addEventListener('pause',syncMusic);
+music.addEventListener('playing',syncMusic);
+syncMusic();
+// Mobile browsers may require a tap on the envelope to allow audio.
