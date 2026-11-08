@@ -13,7 +13,8 @@ const calendar=document.getElementById('calendarDays');const first=new Date(2026
 const fmt=d=>d.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
 const calendarUrl=new URL('https://calendar.google.com/calendar/render');calendarUrl.searchParams.set('action','TEMPLATE');calendarUrl.searchParams.set('text','خطوبة حسناء وعبدالله | Hasnaa & Abdullah Engagement');calendarUrl.searchParams.set('dates',fmt(EVENT_START)+'/'+fmt(EVENT_END));calendarUrl.searchParams.set('details','Join us to celebrate the engagement of Hasnaa & Abdullah! '+MAP_URL);calendarUrl.searchParams.set('location',MAP_URL);document.getElementById('calendarLink').href=calendarUrl.toString();
 // Set the host's WhatsApp number in international format, e.g. 201XXXXXXXXX.
-const RSVP_WHATSAPP_NUMBER = 'REPLACE_WITH_HOST_WHATSAPP_NUMBER';
+const RSVP_WHATSAPP_NUMBER = '201095070145';
+
 const rsvpForm = document.getElementById('rsvpForm');
 rsvpForm.addEventListener('submit', event => {
   event.preventDefault();
